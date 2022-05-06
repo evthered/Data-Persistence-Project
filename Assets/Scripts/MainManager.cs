@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using System.IO;
 
 public class MainManager : MonoBehaviour
 {
@@ -10,16 +11,24 @@ public class MainManager : MonoBehaviour
     public int LineCount = 6;
     public Rigidbody Ball;
 
-    public Text ScoreText;
+    public Text scoreText;
+    public Text currentPlayerName;
+    public Text bestPlayerName;
     public GameObject GameOverText;
     
     private bool m_Started = false;
-    private int m_Points;
+    public int m_Points;
     
     private bool m_GameOver = false;
 
-    
-    // Start is called before the first frame update
+    private static int bestScore;
+    private static string bestPlayer;
+
+    private void Awake()
+    {
+        LoadGame();
+    }
+
     void Start()
     {
         const float step = 0.6f;
@@ -36,6 +45,9 @@ public class MainManager : MonoBehaviour
                 brick.onDestroyed.AddListener(AddPoint);
             }
         }
+
+        currentPlayerName.text = $" Current Player: {DataPersistence.instance.playerName}";
+        SetBestPlayer();
     }
 
     private void Update()
@@ -65,12 +77,77 @@ public class MainManager : MonoBehaviour
     void AddPoint(int point)
     {
         m_Points += point;
-        ScoreText.text = $"Score : {m_Points}";
+        DataPersistence.instance.score = m_Points;
+        scoreText.text = $"Score : {m_Points}";
     }
 
     public void GameOver()
     {
         m_GameOver = true;
+        CheckBestPlayer();
         GameOverText.SetActive(true);
+    }
+
+    private void CheckBestPlayer()
+    {
+        int currentScore = DataPersistence.instance.score;
+
+        if (currentScore > bestScore)
+        {
+            bestPlayer = DataPersistence.instance.playerName;
+            bestScore = currentScore;
+            bestPlayerName.text = $"Best Score - {bestPlayer}: {bestScore}";
+
+            SaveGame(bestPlayer, bestScore);
+        }
+    }
+
+    private void SetBestPlayer()
+    {//check for previous data and return blank if null
+        if(bestPlayer == null && bestScore == 0)
+        {
+            bestPlayerName.text = "";
+        }
+        else
+        {
+            bestPlayerName.text = $"Best Score - {bestPlayer}: {bestScore}";
+        }
+    }
+
+    public void BackToMenu()
+    {
+        SceneManager.LoadScene(0);
+    }
+
+    [System.Serializable]
+    class SaveData
+    {
+        public int highestScore;
+        public string theBestPlayer;
+    }
+
+    public void SaveGame( string bestPlayerName, int bestPlayerScore)
+    {
+        SaveData data = new SaveData();
+
+        data.theBestPlayer = bestPlayerName;
+        data.highestScore = bestPlayerScore;
+
+        string json = JsonUtility.ToJson(data);
+        File.WriteAllText(Application.persistentDataPath + "/savefile.json", json);
+    }
+
+    public void LoadGame()
+    {
+        string path = Application.persistentDataPath + "/savefile.json";
+
+        if(File.Exists(path))
+        {
+            string json = File.ReadAllText(path);
+            SaveData data = JsonUtility.FromJson<SaveData>(json);
+
+            bestPlayer = data.theBestPlayer;
+            bestScore = data.highestScore;
+        }
     }
 }
